@@ -12,7 +12,7 @@ services:
         value: production
       - key: JWT_SECRET
         generateValue: true
-      - key: DATABASE_URL
+      - key: postgresql://neondb_owner:npg_iuwjvsD64mYF@ep-calm-hill-b6mollmz-pooler.c-2.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require
         sync: false
-      - key: FRONTEND_URL
+      - key: http://localhost:5173
         sync: false
