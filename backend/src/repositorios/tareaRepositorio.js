@@ -52,7 +52,35 @@ function crearTareaRepositorio(db) {
     return aTarea(rows[0]);
   }
 
-  return { crear, listar, buscar };
+  async function cambiarEstado(usuarioId, id, { desde, hacia, variacionEnProgreso }) {
+    try {
+      const { rows } = await db.query(
+        `WITH cambiada AS (
+           UPDATE tareas
+              SET estado = $3::varchar,
+                  actualizada_en = now(),
+                  completada_en = CASE WHEN $3::varchar = 'completada' THEN now() ELSE NULL END
+            WHERE id = $1 AND usuario_id = $2 AND estado = $4
+           RETURNING ${COLUMNAS}
+         ), contador AS (
+           UPDATE usuarios
+              SET tareas_en_progreso = tareas_en_progreso + $5
+            WHERE id = $2 AND EXISTS (SELECT 1 FROM cambiada)
+           RETURNING tareas_en_progreso
+         )
+         SELECT cambiada.* FROM cambiada LEFT JOIN contador ON true`,
+        [id, usuarioId, hacia, desde, variacionEnProgreso],
+      );
+      return { tarea: aTarea(rows[0]) };
+    } catch (error) {
+      if (error.code === "23514" && error.constraint === "limite_de_foco") {
+        return { limiteAlcanzado: true };
+      }
+      throw error;
+    }
+  }
+
+  return { crear, listar, buscar, cambiarEstado };
 }
 
 export { crearTareaRepositorio };

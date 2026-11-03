@@ -18,6 +18,7 @@ function crearApp({ config, servicios }) {
   router.get("/api/tareas", tareas.listar);
   router.post("/api/tareas", tareas.crear);
   router.get("/api/tareas/:id", tareas.obtener);
+  router.patch("/api/tareas/:id/estado", tareas.cambiarEstado);
 
   return async function manejarPedido(req, res) {
     try {

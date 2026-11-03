@@ -91,3 +91,94 @@ test("R4: cada usuario ve solo sus tareas y la de otro da 404", async () => {
   await assert.rejects(() => servicio.obtener(ana, deLuis.id), { status: 404 });
   await assert.rejects(() => servicio.obtener(luis, "no-es-un-id"), { status: 404 });
 });
+
+async function conTareas(servicio, usuarioId, cantidad) {
+  const creadas = [];
+  for (let i = 1; i <= cantidad; i += 1) {
+    creadas.push(await servicio.crear(usuarioId, { titulo: `Tarea ${i}` }));
+  }
+  return creadas;
+}
+
+test("R11: recorre el ciclo permitido pendiente → en progreso → completada → pendiente", async () => {
+  const { servicio, luis } = await armar();
+  const [tarea] = await conTareas(servicio, luis, 1);
+  assert.equal((await servicio.cambiarEstado(luis, tarea.id, { estado: "en_progreso" })).estado, "en_progreso");
+  assert.equal((await servicio.cambiarEstado(luis, tarea.id, { estado: "pendiente" })).estado, "pendiente");
+  await servicio.cambiarEstado(luis, tarea.id, { estado: "en_progreso" });
+  assert.equal((await servicio.cambiarEstado(luis, tarea.id, { estado: "completada" })).estado, "completada");
+  assert.equal((await servicio.cambiarEstado(luis, tarea.id, { estado: "pendiente" })).estado, "pendiente");
+});
+
+test("R11: no se puede pasar de pendiente a completada directo (409)", async () => {
+  const { servicio, luis } = await armar();
+  const [tarea] = await conTareas(servicio, luis, 1);
+  await assert.rejects(
+    () => servicio.cambiarEstado(luis, tarea.id, { estado: "completada" }),
+    { status: 409, message: /empezar la tarea/ },
+  );
+});
+
+test("R11: de completada no se vuelve a en progreso sin reabrir (409)", async () => {
+  const { servicio, luis } = await armar();
+  const [tarea] = await conTareas(servicio, luis, 1);
+  await servicio.cambiarEstado(luis, tarea.id, { estado: "en_progreso" });
+  await servicio.cambiarEstado(luis, tarea.id, { estado: "completada" });
+  await assert.rejects(() => servicio.cambiarEstado(luis, tarea.id, { estado: "en_progreso" }), { status: 409 });
+});
+
+test("R11: un estado que no existe es 400 y pedir el mismo estado no cambia nada", async () => {
+  const { servicio, luis } = await armar();
+  const [tarea] = await conTareas(servicio, luis, 1);
+  await assert.rejects(() => servicio.cambiarEstado(luis, tarea.id, { estado: "hecha" }), { status: 400 });
+  await assert.rejects(() => servicio.cambiarEstado(luis, tarea.id, {}), { status: 400 });
+  assert.equal((await servicio.cambiarEstado(luis, tarea.id, { estado: "pendiente" })).estado, "pendiente");
+});
+
+test("R12: máximo 3 tareas en progreso; la cuarta da 409", async () => {
+  const { servicio, luis } = await armar();
+  const [t1, t2, t3, t4] = await conTareas(servicio, luis, 4);
+  for (const t of [t1, t2, t3]) await servicio.cambiarEstado(luis, t.id, { estado: "en_progreso" });
+  await assert.rejects(
+    () => servicio.cambiarEstado(luis, t4.id, { estado: "en_progreso" }),
+    { status: 409, message: /3 tareas en progreso/ },
+  );
+  const sigue = await servicio.obtener(luis, t4.id);
+  assert.equal(sigue.estado, "pendiente");
+});
+
+test("R12: al pausar o completar una se libera el lugar", async () => {
+  const { servicio, luis } = await armar();
+  const [t1, t2, t3, t4, t5] = await conTareas(servicio, luis, 5);
+  for (const t of [t1, t2, t3]) await servicio.cambiarEstado(luis, t.id, { estado: "en_progreso" });
+  await servicio.cambiarEstado(luis, t1.id, { estado: "pendiente" });
+  await servicio.cambiarEstado(luis, t4.id, { estado: "en_progreso" });
+  await servicio.cambiarEstado(luis, t2.id, { estado: "completada" });
+  assert.equal((await servicio.cambiarEstado(luis, t5.id, { estado: "en_progreso" })).estado, "en_progreso");
+});
+
+test("R12: el límite es por usuario", async () => {
+  const { servicio, luis, ana } = await armar();
+  for (const t of await conTareas(servicio, luis, 3)) {
+    await servicio.cambiarEstado(luis, t.id, { estado: "en_progreso" });
+  }
+  const [deAna] = await conTareas(servicio, ana, 1);
+  assert.equal((await servicio.cambiarEstado(ana, deAna.id, { estado: "en_progreso" })).estado, "en_progreso");
+});
+
+test("R13: al completar se guarda la fecha y al reabrir se borra", async () => {
+  const { servicio, luis, reloj } = await armar();
+  const [tarea] = await conTareas(servicio, luis, 1);
+  await servicio.cambiarEstado(luis, tarea.id, { estado: "en_progreso" });
+  reloj.fijar("2026-11-05T10:00:00-03:00");
+  const completada = await servicio.cambiarEstado(luis, tarea.id, { estado: "completada" });
+  assert.equal(completada.completadaEn, "2026-11-05T13:00:00.000Z");
+  const reabierta = await servicio.cambiarEstado(luis, tarea.id, { estado: "pendiente" });
+  assert.equal(reabierta.completadaEn, null);
+});
+
+test("R4: no se puede cambiar el estado de una tarea ajena", async () => {
+  const { servicio, luis, ana } = await armar();
+  const [tarea] = await conTareas(servicio, luis, 1);
+  await assert.rejects(() => servicio.cambiarEstado(ana, tarea.id, { estado: "en_progreso" }), { status: 404 });
+});

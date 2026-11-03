@@ -22,6 +22,12 @@ function crearTareaControlador({ authServicio, tareaServicio }) {
       const tarea = await tareaServicio.obtener(usuarioId(req), params.id);
       return { status: 200, datos: { tarea } };
     },
+
+    async cambiarEstado({ req, params }) {
+      const id = usuarioId(req);
+      const datos = await leerJson(req);
+      return { status: 200, datos: { tarea: await tareaServicio.cambiarEstado(id, params.id, datos) } };
+    },
   };
 }
 

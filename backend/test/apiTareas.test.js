@@ -50,3 +50,22 @@ test("R4: la tarea de otro usuario responde 404", async () => {
   const lista = await pedir(app.url, "GET", "/api/tareas", { token: ana });
   assert.equal(lista.datos.tareas.length, 0);
 });
+
+test("PATCH /api/tareas/:id/estado aplica transiciones y el límite de foco", async () => {
+  const token = await app.nuevoUsuario();
+  const ids = [];
+  for (let i = 0; i < 4; i += 1) {
+    const r = await pedir(app.url, "POST", "/api/tareas", { token, cuerpo: { titulo: `T${i}` } });
+    ids.push(r.datos.tarea.id);
+  }
+  const directo = await pedir(app.url, "PATCH", `/api/tareas/${ids[0]}/estado`, { token, cuerpo: { estado: "completada" } });
+  assert.equal(directo.status, 409);
+
+  for (const id of ids.slice(0, 3)) {
+    const r = await pedir(app.url, "PATCH", `/api/tareas/${id}/estado`, { token, cuerpo: { estado: "en_progreso" } });
+    assert.equal(r.status, 200);
+  }
+  const cuarta = await pedir(app.url, "PATCH", `/api/tareas/${ids[3]}/estado`, { token, cuerpo: { estado: "en_progreso" } });
+  assert.equal(cuarta.status, 409);
+  assert.match(cuarta.datos.error, /3 tareas en progreso/);
+});

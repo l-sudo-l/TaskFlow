@@ -1,8 +1,20 @@
-import { ErrorNoEncontrado, ErrorValidacion } from "../errores.js";
+import { ErrorConflicto, ErrorNoEncontrado, ErrorValidacion } from "../errores.js";
 
 const PRIORIDADES = ["alta", "media", "baja"];
 const ESTADOS = ["pendiente", "en_progreso", "completada"];
 const FORMATO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
+const LIMITE_EN_PROGRESO = 3;
+
+const TRANSICIONES = {
+  pendiente: ["en_progreso"],
+  en_progreso: ["pendiente", "completada"],
+  completada: ["pendiente"],
+};
+
+const MENSAJES_TRANSICION = {
+  "pendiente>completada": "Primero tenés que empezar la tarea (pasarla a en progreso)",
+  "completada>en_progreso": "Para retomar una tarea completada, primero reabrila (pasala a pendiente)",
+};
 
 function esFechaReal(texto) {
   if (!FORMATO_FECHA.test(texto)) return false;
@@ -85,7 +97,39 @@ function crearTareaServicio({ tareas, reloj }) {
     return presentar(await buscarPropia(usuarioId, id));
   }
 
-  return { crear, listar, obtener };
+  async function cambiarEstado(usuarioId, id, datosRecibidos) {
+    const { estado: nuevoEstado } = comoObjeto(datosRecibidos);
+    if (!ESTADOS.includes(nuevoEstado)) {
+      throw new ErrorValidacion("El estado tiene que ser pendiente, en_progreso o completada");
+    }
+    const tarea = await buscarPropia(usuarioId, id);
+    if (tarea.estado === nuevoEstado) return presentar(tarea);
+
+    if (!TRANSICIONES[tarea.estado].includes(nuevoEstado)) {
+      const clave = `${tarea.estado}>${nuevoEstado}`;
+      throw new ErrorConflicto(MENSAJES_TRANSICION[clave] ?? "Ese cambio de estado no está permitido");
+    }
+
+    const variacionEnProgreso =
+      (nuevoEstado === "en_progreso" ? 1 : 0) - (tarea.estado === "en_progreso" ? 1 : 0);
+
+    const resultado = await tareas.cambiarEstado(usuarioId, id, {
+      desde: tarea.estado,
+      hacia: nuevoEstado,
+      variacionEnProgreso,
+    });
+    if (resultado.limiteAlcanzado) {
+      throw new ErrorConflicto(
+        `Ya tenés ${LIMITE_EN_PROGRESO} tareas en progreso. Terminá o pausá alguna antes de empezar otra.`,
+      );
+    }
+    if (!resultado.tarea) {
+      throw new ErrorConflicto("La tarea cambió mientras la editabas. Recargá e intentá de nuevo.");
+    }
+    return presentar(resultado.tarea);
+  }
+
+  return { crear, listar, obtener, cambiarEstado };
 }
 
-export { crearTareaServicio, PRIORIDADES, ESTADOS };
+export { crearTareaServicio, PRIORIDADES, ESTADOS, LIMITE_EN_PROGRESO };
