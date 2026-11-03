@@ -4,8 +4,8 @@ App web para organizar tareas personales. Muestra arriba lo vencido y lo que ven
 
 Proyecto final del bootcamp **Generación T — Stage 2** (programación AI-First).
 
-- **App publicada:** _(se completa al desplegar)_
-- **API:** _(se completa al desplegar)_
+- **App publicada:** https://taskflow-luis.netlify.app
+- **API:** https://taskflow-api-mwor.onrender.com (estado: [`/api/salud`](https://taskflow-api-mwor.onrender.com/api/salud))
 
 ## Qué hace
 
@@ -56,6 +56,8 @@ npm run dev               # http://localhost:5173
 ```
 
 Las tablas se crean solas cuando arranca el backend.
+
+> La API está en el plan gratis de Render: si nadie la usó por un rato, el primer pedido tarda hasta un minuto en responder. La app muestra un aviso mientras tanto.
 
 ## Tests
 

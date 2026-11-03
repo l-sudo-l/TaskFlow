@@ -11,7 +11,7 @@
 | Integración contra PostgreSQL real, con pedidos simultáneos | 7 | ✅ Pasan |
 | **Total backend (`npm test`)** | **70** | **✅ 70/70** |
 | De punta a punta en el navegador (frontend + backend + base) | 18 chequeos | ✅ 18/18 |
-| En producción (Netlify + Render + Neon) | — | Ver la última sección |
+| En producción (Netlify + Render + Neon) | 11 chequeos | ✅ 11/11 |
 
 Los tests de integración usan un PostgreSQL 16 local, la misma versión de motor que da Neon.
 
@@ -85,13 +85,20 @@ Levanté el backend con PostgreSQL y el frontend, y recorrí la app con un naveg
 
 ## Pruebas en producción
 
-_Completar después de publicar (ver [despliegue.md](despliegue.md))._
+Con la app publicada en **https://taskflow-luis.netlify.app**, el backend en **https://taskflow-api-mwor.onrender.com** y la base en Neon. Los pedidos a la API los hice desde la página de Netlify, así que cada uno también prueba que el CORS esté bien configurado.
 
-| # | Qué probar | Resultado |
+| # | Qué probé | Resultado |
 |---|---|---|
-| 1 | `GET https://<render>/api/salud` responde `{"ok":true}` | |
-| 2 | Abrir la app de Netlify, crear cuenta e iniciar sesión | |
-| 3 | Crear tareas, empezar 3 y verificar que la cuarta da el aviso del límite | |
-| 4 | Recargar la página y comprobar que las tareas siguen (quedan guardadas en Neon) | |
-| 5 | Abrir la app desde el celular | |
-| 6 | Después de 15 minutos sin uso, el primer pedido muestra "Despertando el servidor…" y después carga | |
+| 1 | `GET /api/salud` con el servicio dormido | ✅ Muestra la pantalla de "despertando" de Render y después responde `{"ok":true}` |
+| 2 | Crear cuenta desde el frontend de Netlify | ✅ 201. CORS acepta el origen de Netlify |
+| 3 | Crear 4 tareas, con prioridad, fecha y categoría | ✅ 201 las 4 |
+| 4 | Empezar las 4 | ✅ Las primeras 3 dan 200; la cuarta da 409 "Ya tenés 3 tareas en progreso…" |
+| 5 | Resumen | ✅ `total 4, pendiente 1, en_progreso 3, completada 0, vencidas 0` |
+| 6 | Pausar una y mandar dos "Empezar" **al mismo tiempo** | ✅ Uno da 200 y el otro 409. Quedan exactamente 3 en progreso, contra la base real de Neon |
+| 7 | Pedir una tarea de otra cuenta | ✅ 404 |
+| 8 | Pedir tareas sin sesión | ✅ 401 |
+| 9 | Crear una tarea con fecha límite pasada | ✅ 400 |
+| 10 | Pasar una tarea de pendiente a completada directo | ✅ 409 |
+| 11 | Ver la app con ancho de celular (375 px) | ✅ Sin scroll horizontal |
+
+Además entré a la app desde el navegador, y el registro, el ingreso y la carga de tareas funcionaron.

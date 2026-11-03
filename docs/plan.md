@@ -82,11 +82,11 @@ Ejemplo de tarea en las respuestas:
 
 | Parte | Servicio | Variables de entorno |
 |---|---|---|
-| Frontend | Netlify (base `frontend`, comando `npm run build`, carpeta `dist`) | `VITE_API_URL` |
-| Backend | Render (raíz `backend`, `npm install`, `npm start`) | `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL` |
+| Frontend | Netlify — https://taskflow-luis.netlify.app | `VITE_API_URL` |
+| Backend | Render — https://taskflow-api-mwor.onrender.com | `DATABASE_URL`, `JWT_SECRET`, `FRONTEND_URL` |
 | Base | Neon (PostgreSQL) | — |
 
-Las tablas se crean solas cuando arranca el backend (`CREATE TABLE IF NOT EXISTS`), así no hace falta entrar a la base a mano.
+Las tablas se crean solas cuando arranca el backend (`CREATE TABLE IF NOT EXISTS`), así no hace falta entrar a la base a mano. La configuración de Render está en `render.yaml` y la de Netlify en `netlify.toml`. Los valores secretos se cargan en el panel de cada servicio y no están en el repo (R23). Cada push a `main` vuelve a publicar los dos.
 
 ## Cómo pruebo
 

@@ -50,4 +50,4 @@ docs/       spec, plan, tareas, informe de pruebas
 
 ## Agentes del proyecto
 
-En `.cursor/agents/` está el revisor que armé en el Módulo 3 (TP 6 y 7). Revisa cada cambio antes del commit.
+En `.cursor/agents/` está el revisor que armé en el Módulo 3 (TP 6 y 7). Sirve para revisar seguridad y robustez cuando se toca un endpoint, el acceso a datos o la configuración.
