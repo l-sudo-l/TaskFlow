@@ -6,7 +6,7 @@ Cada tarea es un commit. El ciclo de cada una: test que falla, código para que 
 |---|---|---|---|
 | T1 | Spec, plan y AGENTS.md | — | [x] |
 | T2 | Estructura del backend, configuración y Reloj | R20 | [x] |
-| T3 | Esquema de la base y conexión | R12 (CHECK), R23 | [ ] |
+| T3 | Esquema de la base y conexión | R12 (CHECK), R23 | [x] |
 | T4 | Registro y login | R1, R2, R3 | [ ] |
 | T5 | Crear, listar y ver tareas | R4, R5–R10 | [ ] |
 | T6 | Cambios de estado y límite de foco | R11, R12, R13 | [ ] |
