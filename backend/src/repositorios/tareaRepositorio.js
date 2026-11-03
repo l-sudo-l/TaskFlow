@@ -4,6 +4,14 @@ const COLUMNAS = `id, titulo, descripcion, prioridad, categoria,
   to_char(fecha_limite, 'YYYY-MM-DD') AS fecha_limite,
   estado, creada_en, actualizada_en, completada_en`;
 
+const COLUMNA_DE_CAMPO = {
+  titulo: "titulo",
+  descripcion: "descripcion",
+  prioridad: "prioridad",
+  categoria: "categoria",
+  fechaLimite: "fecha_limite",
+};
+
 function aIso(valor) {
   return valor ? new Date(valor).toISOString() : null;
 }
@@ -80,7 +88,39 @@ function crearTareaRepositorio(db) {
     }
   }
 
-  return { crear, listar, buscar, cambiarEstado };
+  async function actualizar(usuarioId, id, cambios) {
+    const campos = Object.keys(cambios).filter((campo) => COLUMNA_DE_CAMPO[campo]);
+    if (campos.length === 0) return buscar(usuarioId, id);
+    const asignaciones = campos.map((campo, i) => `${COLUMNA_DE_CAMPO[campo]} = $${i + 3}`);
+    const { rows } = await db.query(
+      `UPDATE tareas
+          SET ${asignaciones.join(", ")}, actualizada_en = now()
+        WHERE id = $1 AND usuario_id = $2 AND estado <> 'completada'
+       RETURNING ${COLUMNAS}`,
+      [id, usuarioId, ...campos.map((campo) => cambios[campo])],
+    );
+    return aTarea(rows[0]);
+  }
+
+  async function eliminar(usuarioId, id) {
+    if (!FORMATO_UUID.test(String(id))) return false;
+    const { rows } = await db.query(
+      `WITH borrada AS (
+         DELETE FROM tareas WHERE id = $1 AND usuario_id = $2
+         RETURNING estado
+       ), contador AS (
+         UPDATE usuarios
+            SET tareas_en_progreso = tareas_en_progreso - 1
+          WHERE id = $2 AND EXISTS (SELECT 1 FROM borrada WHERE estado = 'en_progreso')
+         RETURNING tareas_en_progreso
+       )
+       SELECT count(*) AS cantidad FROM borrada`,
+      [id, usuarioId],
+    );
+    return Number(rows[0].cantidad) > 0;
+  }
+
+  return { crear, listar, buscar, cambiarEstado, actualizar, eliminar };
 }
 
 export { crearTareaRepositorio };

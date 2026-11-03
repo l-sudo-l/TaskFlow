@@ -10,7 +10,7 @@ Cada tarea es un commit. El ciclo de cada una: test que falla, código para que 
 | T4 | Registro y login | R1, R2, R3 | [x] |
 | T5 | Crear, listar y ver tareas | R4, R5–R10 | [x] |
 | T6 | Cambios de estado y límite de foco | R11, R12, R13 | [x] |
-| T7 | Editar y eliminar | R9, R14, R18 | [ ] |
+| T7 | Editar y eliminar | R9, R14, R18 | [x] |
 | T8 | Vencidas, orden, filtros y resumen | R15, R16, R17, R19 | [ ] |
 | T9 | Seguridad HTTP: tamaño, errores y CORS | R21, R22, R24 | [ ] |
 | T10 | Tests de integración con PostgreSQL | R4, R12 | [ ] |

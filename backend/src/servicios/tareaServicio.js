@@ -4,6 +4,7 @@ const PRIORIDADES = ["alta", "media", "baja"];
 const ESTADOS = ["pendiente", "en_progreso", "completada"];
 const FORMATO_FECHA = /^\d{4}-\d{2}-\d{2}$/;
 const LIMITE_EN_PROGRESO = 3;
+const CAMPOS_EDITABLES = ["titulo", "descripcion", "prioridad", "categoria", "fechaLimite"];
 
 const TRANSICIONES = {
   pendiente: ["en_progreso"],
@@ -129,7 +130,38 @@ function crearTareaServicio({ tareas, reloj }) {
     return presentar(resultado.tarea);
   }
 
-  return { crear, listar, obtener, cambiarEstado };
+  async function editar(usuarioId, id, datosRecibidos) {
+    const datos = comoObjeto(datosRecibidos);
+    const camposRecibidos = CAMPOS_EDITABLES.filter((campo) => Object.hasOwn(datos, campo));
+    if (camposRecibidos.length === 0) {
+      throw new ErrorValidacion("No mandaste ningún dato para cambiar");
+    }
+
+    const tarea = await buscarPropia(usuarioId, id);
+    if (tarea.estado === "completada") {
+      throw new ErrorConflicto("Una tarea completada no se puede editar. Reabrila primero.");
+    }
+
+    const hoy = reloj.hoy();
+    const cambios = {};
+    for (const campo of camposRecibidos) {
+      const fechaSinCambios = campo === "fechaLimite" && datos.fechaLimite === tarea.fechaLimite;
+      cambios[campo] = fechaSinCambios ? tarea.fechaLimite : validadores[campo](datos[campo], { hoy });
+    }
+
+    const actualizada = await tareas.actualizar(usuarioId, id, cambios);
+    if (!actualizada) {
+      throw new ErrorConflicto("La tarea cambió mientras la editabas. Recargá e intentá de nuevo.");
+    }
+    return presentar(actualizada);
+  }
+
+  async function eliminar(usuarioId, id) {
+    const eliminada = await tareas.eliminar(usuarioId, id);
+    if (!eliminada) throw new ErrorNoEncontrado("La tarea no existe");
+  }
+
+  return { crear, listar, obtener, cambiarEstado, editar, eliminar };
 }
 
 export { crearTareaServicio, PRIORIDADES, ESTADOS, LIMITE_EN_PROGRESO };

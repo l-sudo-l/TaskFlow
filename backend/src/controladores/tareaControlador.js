@@ -28,6 +28,17 @@ function crearTareaControlador({ authServicio, tareaServicio }) {
       const datos = await leerJson(req);
       return { status: 200, datos: { tarea: await tareaServicio.cambiarEstado(id, params.id, datos) } };
     },
+
+    async editar({ req, params }) {
+      const id = usuarioId(req);
+      const datos = await leerJson(req);
+      return { status: 200, datos: { tarea: await tareaServicio.editar(id, params.id, datos) } };
+    },
+
+    async eliminar({ req, params }) {
+      await tareaServicio.eliminar(usuarioId(req), params.id);
+      return { status: 204 };
+    },
   };
 }
 

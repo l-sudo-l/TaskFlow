@@ -67,6 +67,19 @@ function crearRepositoriosEnMemoria({ reloj } = {}) {
       tarea.completadaEn = hacia === "completada" ? ahora() : null;
       return { tarea: copia(tarea) };
     },
+    async actualizar(usuarioId, id, cambios) {
+      const tarea = tareasPorId.get(id);
+      if (!tarea || tarea.usuarioId !== usuarioId || tarea.estado === "completada") return null;
+      Object.assign(tarea, cambios, { actualizadaEn: ahora() });
+      return copia(tarea);
+    },
+    async eliminar(usuarioId, id) {
+      const tarea = tareasPorId.get(id);
+      if (!tarea || tarea.usuarioId !== usuarioId) return false;
+      if (tarea.estado === "en_progreso") usuariosPorId.get(usuarioId).tareasEnProgreso -= 1;
+      tareasPorId.delete(id);
+      return true;
+    },
   };
 
   return { usuarios, tareas };

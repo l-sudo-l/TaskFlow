@@ -182,3 +182,61 @@ test("R4: no se puede cambiar el estado de una tarea ajena", async () => {
   const [tarea] = await conTareas(servicio, luis, 1);
   await assert.rejects(() => servicio.cambiarEstado(ana, tarea.id, { estado: "en_progreso" }), { status: 404 });
 });
+
+test("editar cambia solo los campos que se mandan y valida igual que al crear", async () => {
+  const { servicio, luis } = await armar();
+  const tarea = await servicio.crear(luis, { titulo: "Original", descripcion: "desc", prioridad: "baja" });
+  const editada = await servicio.editar(luis, tarea.id, { titulo: " Nuevo título ", prioridad: "alta" });
+  assert.equal(editada.titulo, "Nuevo título");
+  assert.equal(editada.prioridad, "alta");
+  assert.equal(editada.descripcion, "desc");
+
+  await assert.rejects(() => servicio.editar(luis, tarea.id, { titulo: "" }), { status: 400 });
+  await assert.rejects(() => servicio.editar(luis, tarea.id, { prioridad: "urgente" }), { status: 400 });
+  await assert.rejects(() => servicio.editar(luis, tarea.id, {}), { status: 400 });
+  await assert.rejects(() => servicio.editar(luis, tarea.id, { estado: "completada" }), { status: 400 });
+});
+
+test("R9: al editar, una fecha nueva no puede ser pasada, pero se puede sacar la fecha", async () => {
+  const { servicio, luis } = await armar();
+  const tarea = await servicio.crear(luis, { titulo: "a", fechaLimite: "2026-11-10" });
+  await assert.rejects(() => servicio.editar(luis, tarea.id, { fechaLimite: "2026-10-01" }), { status: 400 });
+  assert.equal((await servicio.editar(luis, tarea.id, { fechaLimite: "2026-11-20" })).fechaLimite, "2026-11-20");
+  assert.equal((await servicio.editar(luis, tarea.id, { fechaLimite: null })).fechaLimite, null);
+});
+
+test("R9: si la tarea ya venció, se puede editar el título sin que se queje de la fecha", async () => {
+  const { servicio, luis, reloj } = await armar();
+  const tarea = await servicio.crear(luis, { titulo: "a", fechaLimite: "2026-11-03" });
+  reloj.fijar("2026-11-10T12:00:00-03:00");
+  const editada = await servicio.editar(luis, tarea.id, { titulo: "b", fechaLimite: "2026-11-03" });
+  assert.equal(editada.titulo, "b");
+  assert.equal(editada.fechaLimite, "2026-11-03");
+});
+
+test("R14: una tarea completada no se puede editar hasta reabrirla", async () => {
+  const { servicio, luis } = await armar();
+  const tarea = await servicio.crear(luis, { titulo: "a" });
+  await servicio.cambiarEstado(luis, tarea.id, { estado: "en_progreso" });
+  await servicio.cambiarEstado(luis, tarea.id, { estado: "completada" });
+  await assert.rejects(() => servicio.editar(luis, tarea.id, { titulo: "b" }), { status: 409, message: /Reabrila/ });
+  await servicio.cambiarEstado(luis, tarea.id, { estado: "pendiente" });
+  assert.equal((await servicio.editar(luis, tarea.id, { titulo: "b" })).titulo, "b");
+});
+
+test("R18: eliminar borra la tarea propia y la ajena da 404", async () => {
+  const { servicio, luis, ana } = await armar();
+  const tarea = await servicio.crear(luis, { titulo: "a" });
+  await assert.rejects(() => servicio.eliminar(ana, tarea.id), { status: 404 });
+  await servicio.eliminar(luis, tarea.id);
+  await assert.rejects(() => servicio.obtener(luis, tarea.id), { status: 404 });
+  await assert.rejects(() => servicio.eliminar(luis, tarea.id), { status: 404 });
+});
+
+test("R18: eliminar una tarea en progreso libera su lugar en el límite", async () => {
+  const { servicio, luis } = await armar();
+  const [t1, t2, t3, t4] = await conTareas(servicio, luis, 4);
+  for (const t of [t1, t2, t3]) await servicio.cambiarEstado(luis, t.id, { estado: "en_progreso" });
+  await servicio.eliminar(luis, t1.id);
+  assert.equal((await servicio.cambiarEstado(luis, t4.id, { estado: "en_progreso" })).estado, "en_progreso");
+});

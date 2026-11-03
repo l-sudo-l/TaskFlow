@@ -69,3 +69,17 @@ test("PATCH /api/tareas/:id/estado aplica transiciones y el límite de foco", as
   assert.equal(cuarta.status, 409);
   assert.match(cuarta.datos.error, /3 tareas en progreso/);
 });
+
+test("PATCH /api/tareas/:id edita y DELETE responde 204", async () => {
+  const token = await app.nuevoUsuario();
+  const creada = await pedir(app.url, "POST", "/api/tareas", { token, cuerpo: { titulo: "Viejo" } });
+  const id = creada.datos.tarea.id;
+
+  const editada = await pedir(app.url, "PATCH", `/api/tareas/${id}`, { token, cuerpo: { titulo: "Nuevo" } });
+  assert.equal(editada.status, 200);
+  assert.equal(editada.datos.tarea.titulo, "Nuevo");
+
+  const borrada = await pedir(app.url, "DELETE", `/api/tareas/${id}`, { token });
+  assert.equal(borrada.status, 204);
+  assert.equal((await pedir(app.url, "GET", `/api/tareas/${id}`, { token })).status, 404);
+});
