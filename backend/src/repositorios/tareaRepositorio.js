@@ -43,10 +43,23 @@ function crearTareaRepositorio(db) {
     return aTarea(rows[0]);
   }
 
-  async function listar(usuarioId) {
+  async function listar(usuarioId, { estado, prioridad, categoria, texto } = {}) {
+    const condiciones = ["usuario_id = $1"];
+    const valores = [usuarioId];
+    const agregar = (condicion, valor) => {
+      valores.push(valor);
+      condiciones.push(condicion.replaceAll("?", `$${valores.length}`));
+    };
+    if (estado) agregar("estado = ?", estado);
+    if (prioridad) agregar("prioridad = ?", prioridad);
+    if (categoria) agregar("lower(categoria) = lower(?)", categoria);
+    if (texto) {
+      const escapado = texto.replace(/[\\%_]/g, "\\$&");
+      agregar("(titulo ILIKE '%' || ? || '%' OR descripcion ILIKE '%' || ? || '%')", escapado);
+    }
     const { rows } = await db.query(
-      `SELECT ${COLUMNAS} FROM tareas WHERE usuario_id = $1 ORDER BY creada_en DESC`,
-      [usuarioId],
+      `SELECT ${COLUMNAS} FROM tareas WHERE ${condiciones.join(" AND ")} ORDER BY creada_en DESC`,
+      valores,
     );
     return rows.map(aTarea);
   }

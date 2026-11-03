@@ -83,3 +83,20 @@ test("PATCH /api/tareas/:id edita y DELETE responde 204", async () => {
   assert.equal(borrada.status, 204);
   assert.equal((await pedir(app.url, "GET", `/api/tareas/${id}`, { token })).status, 404);
 });
+
+test("GET /api/tareas acepta filtros por query y GET /api/tareas/resumen no se confunde con un id", async () => {
+  const token = await app.nuevoUsuario();
+  await pedir(app.url, "POST", "/api/tareas", { token, cuerpo: { titulo: "Leer apunte", prioridad: "alta" } });
+  await pedir(app.url, "POST", "/api/tareas", { token, cuerpo: { titulo: "Lavar ropa", prioridad: "baja" } });
+
+  const filtrada = await pedir(app.url, "GET", "/api/tareas?prioridad=alta&q=apunte", { token });
+  assert.equal(filtrada.status, 200);
+  assert.deepEqual(filtrada.datos.tareas.map((t) => t.titulo), ["Leer apunte"]);
+
+  assert.equal((await pedir(app.url, "GET", "/api/tareas?estado=cualquiera", { token })).status, 400);
+
+  const resumen = await pedir(app.url, "GET", "/api/tareas/resumen", { token });
+  assert.equal(resumen.status, 200);
+  assert.equal(resumen.datos.resumen.total, 2);
+  assert.equal(resumen.datos.resumen.pendiente, 2);
+});

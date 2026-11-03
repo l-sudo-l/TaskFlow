@@ -17,6 +17,7 @@ function crearApp({ config, servicios }) {
 
   router.get("/api/tareas", tareas.listar);
   router.post("/api/tareas", tareas.crear);
+  router.get("/api/tareas/resumen", tareas.resumen);
   router.get("/api/tareas/:id", tareas.obtener);
   router.patch("/api/tareas/:id", tareas.editar);
   router.delete("/api/tareas/:id", tareas.eliminar);

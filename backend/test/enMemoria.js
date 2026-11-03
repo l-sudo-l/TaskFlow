@@ -46,9 +46,14 @@ function crearRepositoriosEnMemoria({ reloj } = {}) {
       tareasPorId.set(tarea.id, tarea);
       return copia(tarea);
     },
-    async listar(usuarioId) {
+    async listar(usuarioId, { estado, prioridad, categoria, texto } = {}) {
+      const contiene = (campo) => campo.toLowerCase().includes(texto.toLowerCase());
       return [...tareasPorId.values()]
         .filter((tarea) => tarea.usuarioId === usuarioId)
+        .filter((tarea) => !estado || tarea.estado === estado)
+        .filter((tarea) => !prioridad || tarea.prioridad === prioridad)
+        .filter((tarea) => !categoria || tarea.categoria.toLowerCase() === categoria.toLowerCase())
+        .filter((tarea) => !texto || contiene(tarea.titulo) || contiene(tarea.descripcion))
         .map(copia);
     },
     async buscar(usuarioId, id) {

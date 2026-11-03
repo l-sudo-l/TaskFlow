@@ -7,9 +7,13 @@ function crearTareaControlador({ authServicio, tareaServicio }) {
   }
 
   return {
-    async listar({ req }) {
-      const tareas = await tareaServicio.listar(usuarioId(req));
+    async listar({ req, query }) {
+      const tareas = await tareaServicio.listar(usuarioId(req), Object.fromEntries(query));
       return { status: 200, datos: { tareas } };
+    },
+
+    async resumen({ req }) {
+      return { status: 200, datos: { resumen: await tareaServicio.resumen(usuarioId(req)) } };
     },
 
     async crear({ req }) {

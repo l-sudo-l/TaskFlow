@@ -240,3 +240,100 @@ test("R18: eliminar una tarea en progreso libera su lugar en el límite", async 
   await servicio.eliminar(luis, t1.id);
   assert.equal((await servicio.cambiarEstado(luis, t4.id, { estado: "en_progreso" })).estado, "en_progreso");
 });
+
+test("R15: vencida si la fecha ya pasó y no está completada; la que vence hoy no está vencida", async () => {
+  const { servicio, luis, reloj } = await armar();
+  const ayer = await servicio.crear(luis, { titulo: "Vence el 5", fechaLimite: "2026-11-05" });
+  const hoy = await servicio.crear(luis, { titulo: "Vence el 6", fechaLimite: "2026-11-06" });
+  const sinFecha = await servicio.crear(luis, { titulo: "Sin fecha" });
+  reloj.fijar("2026-11-06T10:00:00-03:00");
+
+  assert.equal((await servicio.obtener(luis, ayer.id)).vencida, true);
+  assert.equal((await servicio.obtener(luis, hoy.id)).vencida, false);
+  assert.equal((await servicio.obtener(luis, sinFecha.id)).vencida, false);
+
+  await servicio.cambiarEstado(luis, ayer.id, { estado: "en_progreso" });
+  await servicio.cambiarEstado(luis, ayer.id, { estado: "completada" });
+  assert.equal((await servicio.obtener(luis, ayer.id)).vencida, false, "completada ya no cuenta como vencida");
+});
+
+test("R15 + R20: a las 22:00 del 6/11 en Argentina, la que vence el 6/11 todavía no está vencida", async () => {
+  const { servicio, luis, reloj } = await armar();
+  const tarea = await servicio.crear(luis, { titulo: "a", fechaLimite: "2026-11-06" });
+  reloj.fijar("2026-11-07T01:00:00Z");
+  assert.equal((await servicio.obtener(luis, tarea.id)).vencida, false);
+  reloj.fijar("2026-11-07T03:00:00Z");
+  assert.equal((await servicio.obtener(luis, tarea.id)).vencida, true);
+});
+
+test("R16: orden: vencidas, fecha más cercana, sin fecha al final, prioridad y más nuevas", async () => {
+  const { servicio, luis, reloj } = await armar();
+  const crear = async (titulo, extra) => {
+    reloj.fijar(new Date(reloj.ahora().getTime() + 60_000).toISOString());
+    return servicio.crear(luis, { titulo, ...extra });
+  };
+  await crear("sin fecha baja", { prioridad: "baja" });
+  await crear("sin fecha alta vieja", { prioridad: "alta" });
+  await crear("sin fecha alta nueva", { prioridad: "alta" });
+  await crear("vence el 20", { fechaLimite: "2026-11-20" });
+  await crear("vence el 10 media", { fechaLimite: "2026-11-10" });
+  await crear("vence el 10 alta", { fechaLimite: "2026-11-10", prioridad: "alta" });
+  await crear("vencida", { fechaLimite: "2026-11-03" });
+  reloj.fijar("2026-11-05T12:00:00-03:00");
+
+  const titulos = (await servicio.listar(luis)).map((t) => t.titulo);
+  assert.deepEqual(titulos, [
+    "vencida",
+    "vence el 10 alta",
+    "vence el 10 media",
+    "vence el 20",
+    "sin fecha alta nueva",
+    "sin fecha alta vieja",
+    "sin fecha baja",
+  ]);
+});
+
+test("R17: filtra por estado, prioridad, categoría, texto y vencidas, y se combinan", async () => {
+  const { servicio, luis, reloj } = await armar();
+  const parcial = await servicio.crear(luis, { titulo: "Estudiar Parcial", categoria: "Facultad", prioridad: "alta", fechaLimite: "2026-11-04" });
+  await servicio.crear(luis, { titulo: "Comprar yerba", categoria: "Casa", prioridad: "baja" });
+  await servicio.crear(luis, { titulo: "Informe", descripcion: "para el PARCIAL de física", categoria: "facultad" });
+  await servicio.cambiarEstado(luis, parcial.id, { estado: "en_progreso" });
+  reloj.fijar("2026-11-08T12:00:00-03:00");
+
+  const titulos = async (filtros) => (await servicio.listar(luis, filtros)).map((t) => t.titulo).sort();
+  assert.deepEqual(await titulos({ estado: "en_progreso" }), ["Estudiar Parcial"]);
+  assert.deepEqual(await titulos({ prioridad: "baja" }), ["Comprar yerba"]);
+  assert.deepEqual(await titulos({ categoria: "FACULTAD" }), ["Estudiar Parcial", "Informe"]);
+  assert.deepEqual(await titulos({ q: "parcial" }), ["Estudiar Parcial", "Informe"]);
+  assert.deepEqual(await titulos({ vencidas: "1" }), ["Estudiar Parcial"]);
+  assert.deepEqual(await titulos({ q: "parcial", estado: "pendiente" }), ["Informe"]);
+  assert.deepEqual(await titulos({ q: "no existe" }), []);
+});
+
+test("R17: filtros inválidos responden 400", async () => {
+  const { servicio, luis } = await armar();
+  await assert.rejects(() => servicio.listar(luis, { estado: "hecha" }), { status: 400 });
+  await assert.rejects(() => servicio.listar(luis, { prioridad: "urgente" }), { status: 400 });
+  await assert.rejects(() => servicio.listar(luis, { q: "x".repeat(101) }), { status: 400 });
+});
+
+test("R19: el resumen cuenta por estado y vencidas", async () => {
+  const { servicio, luis, ana, reloj } = await armar();
+  const [t1, t2] = await conTareas(servicio, luis, 3);
+  await servicio.crear(luis, { titulo: "con fecha", fechaLimite: "2026-11-03" });
+  await servicio.crear(ana, { titulo: "de Ana" });
+  await servicio.cambiarEstado(luis, t1.id, { estado: "en_progreso" });
+  await servicio.cambiarEstado(luis, t2.id, { estado: "en_progreso" });
+  await servicio.cambiarEstado(luis, t2.id, { estado: "completada" });
+  reloj.fijar("2026-11-04T12:00:00-03:00");
+
+  assert.deepEqual(await servicio.resumen(luis), {
+    total: 4,
+    pendiente: 2,
+    en_progreso: 1,
+    completada: 1,
+    vencidas: 1,
+    limiteEnProgreso: 3,
+  });
+});

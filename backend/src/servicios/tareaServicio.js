@@ -65,8 +65,42 @@ function comoObjeto(datos) {
   return datos && typeof datos === "object" && !Array.isArray(datos) ? datos : {};
 }
 
-function presentar(tarea) {
-  return { ...tarea };
+function estaVencida(tarea, hoy) {
+  return Boolean(tarea.fechaLimite) && tarea.fechaLimite < hoy && tarea.estado !== "completada";
+}
+
+function presentar(tarea, hoy) {
+  return { ...tarea, vencida: estaVencida(tarea, hoy) };
+}
+
+const ORDEN_PRIORIDAD = { alta: 0, media: 1, baja: 2 };
+
+function compararTareas(a, b) {
+  if (a.vencida !== b.vencida) return a.vencida ? -1 : 1;
+  if (a.fechaLimite !== b.fechaLimite) {
+    if (!a.fechaLimite) return 1;
+    if (!b.fechaLimite) return -1;
+    return a.fechaLimite < b.fechaLimite ? -1 : 1;
+  }
+  if (a.prioridad !== b.prioridad) return ORDEN_PRIORIDAD[a.prioridad] - ORDEN_PRIORIDAD[b.prioridad];
+  return a.creadaEn < b.creadaEn ? 1 : a.creadaEn > b.creadaEn ? -1 : 0;
+}
+
+function leerFiltros(recibidos) {
+  const filtros = comoObjeto(recibidos);
+  const resultado = {};
+  if (filtros.estado) {
+    if (!ESTADOS.includes(filtros.estado)) throw new ErrorValidacion("Filtro de estado inválido");
+    resultado.estado = filtros.estado;
+  }
+  if (filtros.prioridad) {
+    if (!PRIORIDADES.includes(filtros.prioridad)) throw new ErrorValidacion("Filtro de prioridad inválido");
+    resultado.prioridad = filtros.prioridad;
+  }
+  if (filtros.categoria) resultado.categoria = textoOpcional(filtros.categoria, 30, "La categoría");
+  if (filtros.q) resultado.texto = textoOpcional(filtros.q, 100, "La búsqueda");
+  resultado.soloVencidas = filtros.vencidas === "1" || filtros.vencidas === "true" || filtros.vencidas === true;
+  return resultado;
 }
 
 function crearTareaServicio({ tareas, reloj }) {
@@ -80,12 +114,25 @@ function crearTareaServicio({ tareas, reloj }) {
       prioridad: validadores.prioridad(datos.prioridad),
       fechaLimite: validadores.fechaLimite(datos.fechaLimite, { hoy }),
     };
-    return presentar(await tareas.crear(usuarioId, nueva));
+    return presentar(await tareas.crear(usuarioId, nueva), hoy);
   }
 
-  async function listar(usuarioId) {
-    const lista = await tareas.listar(usuarioId, {});
-    return lista.map(presentar);
+  async function listar(usuarioId, filtrosRecibidos) {
+    const { soloVencidas, ...filtros } = leerFiltros(filtrosRecibidos);
+    const hoy = reloj.hoy();
+    const lista = (await tareas.listar(usuarioId, filtros)).map((tarea) => presentar(tarea, hoy));
+    return lista.filter((tarea) => !soloVencidas || tarea.vencida).sort(compararTareas);
+  }
+
+  async function resumen(usuarioId) {
+    const hoy = reloj.hoy();
+    const conteo = { total: 0, pendiente: 0, en_progreso: 0, completada: 0, vencidas: 0 };
+    for (const tarea of await tareas.listar(usuarioId, {})) {
+      conteo.total += 1;
+      conteo[tarea.estado] += 1;
+      if (estaVencida(tarea, hoy)) conteo.vencidas += 1;
+    }
+    return { ...conteo, limiteEnProgreso: LIMITE_EN_PROGRESO };
   }
 
   async function buscarPropia(usuarioId, id) {
@@ -95,7 +142,7 @@ function crearTareaServicio({ tareas, reloj }) {
   }
 
   async function obtener(usuarioId, id) {
-    return presentar(await buscarPropia(usuarioId, id));
+    return presentar(await buscarPropia(usuarioId, id), reloj.hoy());
   }
 
   async function cambiarEstado(usuarioId, id, datosRecibidos) {
@@ -104,7 +151,7 @@ function crearTareaServicio({ tareas, reloj }) {
       throw new ErrorValidacion("El estado tiene que ser pendiente, en_progreso o completada");
     }
     const tarea = await buscarPropia(usuarioId, id);
-    if (tarea.estado === nuevoEstado) return presentar(tarea);
+    if (tarea.estado === nuevoEstado) return presentar(tarea, reloj.hoy());
 
     if (!TRANSICIONES[tarea.estado].includes(nuevoEstado)) {
       const clave = `${tarea.estado}>${nuevoEstado}`;
@@ -127,7 +174,7 @@ function crearTareaServicio({ tareas, reloj }) {
     if (!resultado.tarea) {
       throw new ErrorConflicto("La tarea cambió mientras la editabas. Recargá e intentá de nuevo.");
     }
-    return presentar(resultado.tarea);
+    return presentar(resultado.tarea, reloj.hoy());
   }
 
   async function editar(usuarioId, id, datosRecibidos) {
@@ -153,7 +200,7 @@ function crearTareaServicio({ tareas, reloj }) {
     if (!actualizada) {
       throw new ErrorConflicto("La tarea cambió mientras la editabas. Recargá e intentá de nuevo.");
     }
-    return presentar(actualizada);
+    return presentar(actualizada, hoy);
   }
 
   async function eliminar(usuarioId, id) {
@@ -161,7 +208,7 @@ function crearTareaServicio({ tareas, reloj }) {
     if (!eliminada) throw new ErrorNoEncontrado("La tarea no existe");
   }
 
-  return { crear, listar, obtener, cambiarEstado, editar, eliminar };
+  return { crear, listar, resumen, obtener, cambiarEstado, editar, eliminar };
 }
 
 export { crearTareaServicio, PRIORIDADES, ESTADOS, LIMITE_EN_PROGRESO };
