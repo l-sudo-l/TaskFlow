@@ -5,6 +5,8 @@ import { crearPool, crearTablas } from "./db/conexion.js";
 import { crearReloj } from "./reloj.js";
 import { crearUsuarioRepositorio } from "./repositorios/usuarioRepositorio.js";
 import { crearAuthServicio } from "./servicios/authServicio.js";
+import { crearTareaRepositorio } from "./repositorios/tareaRepositorio.js";
+import { crearTareaServicio } from "./servicios/tareaServicio.js";
 
 const config = leerConfig();
 const pool = crearPool(config.databaseUrl);
@@ -12,9 +14,11 @@ await crearTablas(pool);
 
 const reloj = crearReloj();
 const usuarios = crearUsuarioRepositorio(pool);
+const tareas = crearTareaRepositorio(pool);
 
 const servicios = {
   auth: crearAuthServicio({ usuarios, reloj, secreto: config.jwtSecret, diasToken: config.diasToken }),
+  tareas: crearTareaServicio({ tareas, reloj }),
 };
 
 const servidor = http.createServer(crearApp({ config, servicios }));
