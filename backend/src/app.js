@@ -1,11 +1,17 @@
 import { crearRouter } from "./http/router.js";
 import { enviarJson } from "./http/respuestas.js";
 import { ErrorDeApp } from "./errores.js";
+import { crearAuthControlador } from "./controladores/authControlador.js";
 
-function crearApp({ config }) {
+function crearApp({ config, servicios }) {
   const router = crearRouter();
+  const auth = crearAuthControlador(servicios.auth);
 
   router.get("/api/salud", async () => ({ status: 200, datos: { ok: true } }));
+
+  router.post("/api/auth/registro", auth.registro);
+  router.post("/api/auth/login", auth.login);
+  router.get("/api/auth/yo", auth.yo);
 
   return async function manejarPedido(req, res) {
     try {
