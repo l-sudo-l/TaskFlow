@@ -1,6 +1,5 @@
-const enProduccion = process.env.NODE_ENV === "production";
-
 function leerConfig(env = process.env) {
+  const enProduccion = env.NODE_ENV === "production";
   const jwtSecret = env.JWT_SECRET || (enProduccion ? "" : "secreto-solo-para-desarrollo");
   if (!jwtSecret) {
     throw new Error("Falta la variable de entorno JWT_SECRET");

@@ -1,5 +1,6 @@
 import { crearRouter } from "./http/router.js";
 import { enviarJson } from "./http/respuestas.js";
+import { aplicarCors } from "./http/cors.js";
 import { ErrorDeApp } from "./errores.js";
 import { crearAuthControlador } from "./controladores/authControlador.js";
 import { crearTareaControlador } from "./controladores/tareaControlador.js";
@@ -25,6 +26,11 @@ function crearApp({ config, servicios }) {
 
   return async function manejarPedido(req, res) {
     try {
+      aplicarCors(req, res, config.origenesPermitidos);
+      if (req.method === "OPTIONS") {
+        enviarJson(res, 204);
+        return;
+      }
       const url = new URL(req.url, "http://localhost");
       const { manejador, params, existeLaRuta } = router.buscar(req.method, url.pathname);
       if (!manejador) {
