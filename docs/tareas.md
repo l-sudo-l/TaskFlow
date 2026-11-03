@@ -13,7 +13,7 @@ Cada tarea es un commit. El ciclo de cada una: test que falla, código para que 
 | T7 | Editar y eliminar | R9, R14, R18 | [x] |
 | T8 | Vencidas, orden, filtros y resumen | R15, R16, R17, R19 | [x] |
 | T9 | Seguridad HTTP: tamaño, errores y CORS | R21, R22, R24 | [x] |
-| T10 | Tests de integración con PostgreSQL | R4, R12 | [ ] |
+| T10 | Tests de integración con PostgreSQL | R4, R12 | [x] |
 | T11 | Frontend: acceso (login y registro) | R1, R3 | [ ] |
 | T12 | Frontend: tareas, filtros, formulario y resumen | R5–R19 | [ ] |
 | T13 | Despliegue en Neon, Render y Netlify | R23, R24 | [ ] |
